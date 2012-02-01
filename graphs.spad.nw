@@ -1,0 +1,894 @@
+% -*- mode: Noweb; noweb-code-mode: aldor-mode -*-
+
+\documentclass{article}
+\usepackage{axiom,amsthm,amsmath,url}
+\newtheorem{ToDo}{ToDo}[section]
+
+\newcommand{\Axiom}{{\tt Axiom}}
+
+\begin{document}
+\title{graphs.spad}
+\author{Franz Lehner}
+\maketitle
+
+\tableofcontents
+
+\section{domain ADJMAT AdjacencyMatrix}
+From \url{http://wiki.axiom-developer.org/SandBoxCategoryOfGraphs2}.
+Notes: \axiom{S:Type} does not work because 
+\axiom{position(i,V)$OneDimensionalArray S}
+requires \axiom{SetCategory}.
+
+<<domain ADJMAT AdjacencyMatrix>>=
+)abbrev domain ADJMAT AdjacencyMatrix
+++ Author: Franz Lehner lehner@math.tugraz.at
+++ Date Created: 2009
+++ Date Last Updated: 7 June 2009
+++ Fix History: 
+++ Basic Functions:
+++ Related Constructors:
+++ Also See:
+++ AMS Classifications:
+++ Keywords:
+++ References:
+++ Description:
+++   A domain for adjacency matrices of graphs.
+AdjacencyMatrix(S:SetCategory): Decl == Impl where
+    Decl ==> SetCategory with
+        <<AdjacencyMatrix declarations>>
+    Impl ==> add 
+        Rep := Record(matrix:Matrix Integer,vertices:OneDimensionalArray S)
+	
+	Ai:Matrix Integer
+	A: %
+	V: List S
+	i,j: Integer
+	u,v: S
+        <<AdjacencyMatrix implementation>>
+@ 
+
+<<AdjacencyMatrix declarations>>=
+--constructor
+adjacencyMatrix:(Matrix Integer, List S) -> %
+++ \spad{adjacencyMatrix(A:Matrix Integer, V:List S)}
+++ constructs an adjacency matrix with with vertices V and Matrix A
+--access
+vertices:% -> OneDimensionalArray S
+++ \spad{vertices(A)} returns vertices of the adjacency matrix A
+matrix:% -> Matrix Integer
+++ \spad{matrix(A)} returns the underlying 0-1 matrix
+++ of the adjacency matrix A        
+apply:(%,Integer,Integer)-> Integer
+++ \spad{A(i,j)} returns $A_{i,j}$
+apply:(%,S,S)-> Integer
+++ \spad{A(s,t)} returns $A_{i,tj}$, where $i$, $j$ are the positions
+++ of $s$ and $t$ in the vertex list.
+-- output
+coerce:% -> OutputForm
+-- manipulations
+_*:(Permutation Integer,%)->%;
+++ \spad{\pi * A} permutes the vertices and the matrix according to the
+++ permutation \spad{\pi}.
+--  _*:(Permutation S,%)->%;
+@ %
+<<AdjacencyMatrix implementation>>=
+adjacencyMatrix(Ai, V) == 
+    if (nrows Ai ~= #V) or (ncols Ai ~= #V) then
+        error "Sizes not compatible"
+    [Ai,oneDimensionalArray V]
+
+vertices(A) == A.vertices
+
+matrix(A):Matrix Integer == A.matrix
+
+apply(A,i,j) == (A.matrix)(i,j)
+
+apply(A,u,v) == 
+    i := position(u,vertices A)
+    zero? i => error "First index is not a vertex"
+    j := position(v,vertices A)
+    zero? j => error "Second index is not a vertex"
+    (A.matrix)(i,j)
+
+(p:Permutation Integer) * (A) == 
+    mp:Set Integer:= movedPoints p
+    n:Integer := # vertices A
+    if (min mp) < 1 or (max mp) > n then 
+            error "Permutation out of range"
+    -- permute the vertices
+    newvertices:OneDimensionalArray S := oneDimensionalArray [ (vertices A)(eval(p,i)) for i in 1..n]
+    -- permutation matrix
+    indic:List Integer := [eval(p,i) for i in 1..n]
+    newA:Matrix Integer:= (matrix A)(indic,indic)
+    [newA, newvertices]
+
+coerce(A):OutputForm == 
+        bracket commaSeparate [(matrix A)::OutputForm , (vertices A)::OutputForm]
+
+_=(A1:%,A2:%):Boolean == (vertices A1 = vertices A2) and (matrix A1 = matrix A2)
+@ %
+
+\section{category GRAPHC GraphCategory}
+From \url{http://wiki.axiom-developer.org/SandBoxCategoryOfGraphs2}.
+Notes: S:Type does not work because position(i,V)$OneDimensionalArray S
+requires SetCategory.
+\section{category GRAPHC GraphCategory}
+<<category GRAPHC GraphCategory>>=
+)abbrev category GRAPHC GraphCategory
+++ Author: Franz Lehner lehner@math.tugraz.at
+++ Date Created: 2009
+++ Date Last Updated: 29 July 2011
+++ Fix History: 
+++ Basic Functions:
+++ Related Constructors:
+++ Also See:
+++ AMS Classifications:
+++ Keywords:
+++ References:
+++ Description:
+++   Category of graphs
+GraphCategory(nodes:Type, edges:Type): Category ==  with 
+    source:edges->nodes
+    ++ \spad{source(e)} returns the source of an edge e
+    target:edges->nodes
+    ++ \spad{target(e)} returns the target of an edge e
+    outedges:(nodes,%)-> List edges
+    ++ \spad{outedges(v,G)} returns the list of edges emanating from a vertex v
+    inedges:(nodes,%)-> List edges
+    ++ \spad{inedges(v,G)} returns the list of edges going into a vertex v
+    neighbours:(nodes,%)->List nodes
+    ++ \spad{neighbours(v,G)} returns a list of neighbours of a vertex v
+    nodesType:%-> Type
+    ++ \spad{nodesType(G)} returns the type of the nodes of a graph
+    coerce:% -> OutputForm
+@ %
+
+\section{domain EDGE Edge}
+<<domain EDGE Edge>>=
+)abbrev domain EDGE Edge
+++ Author: Franz Lehner lehner@math.tugraz.at
+++ Date Created: 2009
+++ Date Last Updated: 29 July 2011
+++ Fix History: 
+++ Basic Functions:
+++ Related Constructors:
+++ Also See:
+++ AMS Classifications:
+++ Keywords:
+++ References:
+++ Description:
+++   A simple domain for edges of graphs.
+Edge(nodes:SetCategory): Decl == Impl where
+  Decl ==> SetCategory with
+    edge: (nodes,nodes) -> %
+    ++ \spad{edge(u,v)} creates an edge from u to v
+    first:%-> nodes
+    ++ \spad{first(e)} returns the first vertex of an edge e.
+    second:%-> nodes
+    ++ \spad{second(e)} returns the second vertex of an edge e.
+    parts:%-> List nodes
+    ++ \spad{parts(e)} returns the list of vertices of an edge e.	
+    member?:(nodes,%)->Boolean
+    ++ \spad{member?(v,e)} checks if the vertex v is adjacent to the edge e.
+    subst:(nodes,nodes,%)->%
+    ++ \spad{subst(x,y,e)} substitutes vertex x by vertex y.
+  Impl == add 
+    Rep := Record(source:nodes,target:nodes)
+    
+    first(x:%):nodes == x.source
+
+    second(x:%):nodes == x.target
+
+    parts(e:%):List nodes == [first e, second e]
+
+    edge(x:nodes,y:nodes):% == [x,y]
+    
+    _=(x:%,y:%):Boolean ==  
+    	(first(x)=first(y) and second(x)=second(y)) or (first(x)=second(y) and second(x)=first(y))
+
+    coerce(e:%):OutputForm ==
+        bracket commaSeparate [(first e)::OutputForm, (second e)::OutputForm];
+
+    member?(x:nodes,e:%):Boolean == x=first e or x = second e
+    
+    subst(x:nodes,y:nodes,e:%):% ==
+    	edge(if first e = x then y else first e, _
+    	    if second e = x then y else second e)
+@ 
+
+\section{domain FGRAPH FiniteGraph}
+<<domain FGRAPH FiniteGraph>>=
+)abbrev domain FGRAPH FiniteGraph
+++ Author: Franz Lehner lehner@math.tugraz.at
+++ Date Created: 2009
+++ Date Last Updated: 7 June 2009
+++ Fix History: 
+++ Basic Functions:
+++ Related Constructors:
+++ Also See:
+++ AMS Classifications:
+++ Keywords:
+++ References:
+++ Description:
+++   A domain for finite graphs
+FiniteGraph(nodes: SetCategory): FGcat == FGimpl where
+  edges ==> Edge(nodes)
+  FGcat ==> GraphCategory(nodes,edges) with 
+    <<FiniteGraph declarations I/O>>
+    <<FiniteGraph declarations access>>
+    <<FiniteGraph declarations destructive operations>>	
+    <<FiniteGraph declarations copying operations>>
+    <<FiniteGraph declarations animals>>
+    <<FiniteGraph declarations-adjacencymatrix>>
+@ 
+<<domain FGRAPH FiniteGraph>>=
+  FGimpl == add 
+    Rep := Record(node: List nodes, edge: List edges)
+    <<FiniteGraph implementation I/O>>
+    <<FiniteGraph implementation access>>
+    <<FiniteGraph implementation destructive operations>>
+    <<FiniteGraph implementation copying operations>>
+    <<FiniteGraph implementation animals>>
+    <<FiniteGraph implementation-adjacencymatrix>>
+@
+<<domain FGRAPH FiniteGraph todo>>=
+    <<FiniteGraph implementation-debug>>
+@ 
+[[position(n,List nodes)]] did not work if [[nodes]] and [[edges]] do
+not have [[SetCategory]].
+Therefore we must make our own private copy.
+
+<<FiniteGraph declarations-debug>>=
+myposition:(%,nodes,nodes)->Integer
+@
+<<FiniteGraph implementation-debug>>=
+myposition(l:List edges,source:nodes,target:nodes):Integer == 
+    e:edges
+    f:edges
+    i:Integer
+    e:= edge(source,target)
+    for f in l for i in 1..#l repeat 
+        if (f=e) then return i
+    0
+@
+
+\subsection{I/O}
+<<FiniteGraph declarations I/O>>=
+new:()-> %
+++ \spad{new()} creates an empty graph.
+empty:()-> %
+++ \spad{empty()} creates an empty graph.
+copy:%->%
+++ \spad{new()} creates a copy of a graph G.
+_=:(%,%) -> Boolean
+++ \spad{G1=G2} returns true if the vertex sets and the edge sets coincide.
+coerce:% -> OutputForm
+++ \spad{G::OutputForm} returns a pair of vertex and edge lists.
+@ 
+
+<<FiniteGraph implementation I/O>>=
+new():% == 
+    n:List(nodes):=copy []
+    e:List(edges):=copy []
+    [n,e]
+
+empty():% == 
+    n:List(nodes):=copy []
+    e:List(edges):=copy []
+    [n,e]$Rep
+
+copy(G:%):% == [ copy nodeList G, copy edgeList G]
+
+G1,G2:%
+
+_=(G1, G2):Boolean == 
+    nodeq:Boolean := ((set nodeList G1) = (set nodeList G2))$(Set nodes)
+    edgeq:Boolean := ((set edgeList G1) = (set edgeList G2))$(Set edges)
+    nodeq and edgeq
+
+coerce(G:%):OutputForm == 
+    bracket commaSeparate [ nodeList(G)::OutputForm, edgeList(G)::OutputForm ]
+@ 
+
+\subsection{Access}
+<<FiniteGraph declarations access>>=
+--access
+member?:(nodes, %)->Boolean
+++ \spad{member?(x, G)} checks if x is a vertex of G;
+member?:(edges, %)->Boolean
+++ \spad{member?(e, G)} checks if e is a vertex of G;
+edgeList:(%) -> List edges
+++ \spad{edgeList(G)} returns a list of edges
+nodeList: (%) -> List nodes
+++ \spad{nodeList(G)} returns a list of nodes
+subgraph:(%, List nodes) -> %
+++ \spad{subgraph(G, [v1,v2,...,vn])} returns the subgraph induced
+++ on the vertices vi
+connectedComponent:(nodes, %) -> List nodes
+++ \spad{connectedComponent(G, v)} returns a list of vertices
+++ connected to a given vertex v.
+connectedComponents:% -> List List nodes
+++ \spad{connectedComponents(G)} returns a list of connected
+++ components of G
+connected?:% -> Boolean
+++ \spad{connected?(G)} checks whether a graph G is connected.
+@
+<<FiniteGraph implementation access>>=
+member?(x:nodes, G:%):Boolean == 
+    member?(x, nodeList G)
+
+member?(e:edges,G:%):Boolean == 
+    member?(e, edgeList G)
+
+edgeList(G:%):List edges == G.edge
+
+nodeList(G:%):List nodes == G.node
+
+subgraph(G:%, vv:List nodes):% ==
+    G1:%:= new()
+    vv1:=addNode!(G1,vv)
+    E:= edgeList G
+    E1:List Edge nodes:= select( (e:Edge nodes):Boolean +-> _
+               (member?(first e, vv) and member?(second e,vv1)),  E)
+    if not empty? E1 then
+        addEdge!(G1,E1)
+    return G1
+    
+connectedComponent(v, G) ==
+    -- we pick a vertex, collect its neighbours
+    -- then remove the vertex call the procedure with the neighbours
+    nb:List nodes:= neighbours(v, G)
+    res:= cons(v, copy nb)
+    G1:=copy G
+    deleteNode!(G1, v)
+    for u in nb repeat
+        res:=concat!(connectedComponent(u, G1), res)
+        deleteNode!(G1, u)
+    removeDuplicates res
+
+
+-- find connected component of first vertex
+-- remove it and call recursively xxx
+connectedComponents(G:%):List List nodes ==
+    empty? nodeList G => return empty()$(List List nodes)
+    v:nodes := first nodeList G
+    ccv:List nodes := connectedComponent(v,G)
+    G1:% :=copy G
+    for w in ccv repeat
+        deleteNode!(G1, w)
+    cons(ccv, connectedComponents G1)
+
+connected?(G:%):Boolean ==
+    empty? nodeList G => true
+    #connectedComponent(first nodeList G, G) = #nodeList G
+@
+
+
+\subsection{Things required by [[GraphCategory]]}
+<<FiniteGraph implementation access>>=
+outedges(x:nodes, G:%):List edges == [e for e in edgeList G | source e = x]
+
+inedges(x:nodes, G:%):List edges == [e for e in edgeList G | target e = x]
+
+neighbours(x:nodes, G:%):List nodes ==
+    innod:List nodes := [ source e for e in  G.edge | target e = x]
+    outnod:List nodes := [ target e for e in  G.edge |source e = x]
+    removeDuplicates concat( innod,outnod)
+
+nodesType(g:%):Type == nodes
+
+source(e:edges):nodes == first(e)
+
+target(e:edges):nodes == second(e)
+@ 
+
+
+
+\subsection{Destructive Operations}
+<<FiniteGraph declarations destructive operations>>=
+--in place modifications
+addNode!: (%, List nodes) -> List nodes
+++ \spad{addNode!(G,[x1,x2,...])} adds a list of vertices to a graph G.
+addNode!: (%, nodes) -> List nodes
+++ \spad{addNode!(G,x)} adds the vertex x to a graph G.
+addEdge!: (%, nodes, nodes) -> edges
+++ \spad{addEdge!(G,x,y)} adds the edge [x,y] to the graph G.
+addEdge!: (%, List edges) -> List edges
+++ \spad{addEdge!(G,[e1,e2,...])} adds the edges e1,e2,... to the graph G.
+deleteEdge!: (%, nodes, nodes) -> edges
+++ \spad{deleteEdge!(G,x,y)} deletes the edge [x,y].
+deleteNode!: (%, nodes) -> Boolean
+++ \spad{deleteNode!(G,x)} deletes the node x and all adjacent edges.
+subst!:(nodes, nodes, %) -> Boolean
+++ \spad{subst!(x,y,G)} replaces vertex x by vertex y if possible. If y already is there, nothing is done.
+fuse!:(nodes, nodes, %) -> Boolean
+++ \spad{fuse!(x,y,G)} collapses vertex x and vertex y if possible. The new vertex is called y and duplicate edges are removed.
+removeLoops!:(%) -> %
+++ \spad{removeLoops(G)} returns the graph with all loops removed.
+@ 
+<<FiniteGraph implementation destructive operations>>=
+addNode!(G:%, n:nodes):List nodes == addNode!(G, [n])
+addNode!(G:%, n:List nodes):List nodes == 
+    if empty? G.node then 
+        G.node:=n
+    else 
+        G.node:=concat!(G.node, n)
+    G.node:=removeDuplicates! (G.node)
+    n
+
+addEdge!(G:%,source:nodes,target:nodes):edges == 
+    e:edges := edge(source, target);
+    --first add the vertices
+    addNode!(G, [source, target])
+    if empty? G.edge then 
+        G.edge:=[e]
+    else if not member? (e, G.edge) then 
+        G.edge:=concat!(G.edge, [e])
+    edge(source, target)
+
+addEdge!(G:%, ee:List edges):List edges == 
+    --first add the vertices
+    LF2 ==> ListFunctions2(edges, List nodes)
+    newnodesl:List List nodes := map(parts, ee)$LF2
+    newnodes:List nodes:= removeDuplicates reduce(concat, newnodesl)
+    addNode!(G, newnodes)
+    if empty? G.edge then 
+        G.edge:=removeDuplicates ee
+    else 
+        G.edge:=removeDuplicates concat!(G.edge, ee)
+    ee
+
+<<FiniteGraph deleteEdge>>
+<<FiniteGraph deleteNode>>
+@
+
+[[position]] from [[List edges]] does not work if nodes does not have [[SetCategory]].
+<<FiniteGraph deleteEdge>>=
+deleteEdge!(G:%, source:nodes, target:nodes):edges == 
+    e:edges:= edge(source, target)
+    if not empty? G.edge then 
+        k:Integer := position(e, G.edge)
+        if not zero? k then 
+            G.edge:=delete!(G.edge, k)
+    edge(source, target)
+@ 
+<<FiniteGraph deleteNode>>=
+deleteNode!(G:%, x:nodes):Boolean == 
+    k:Integer := position(x, G.node)
+    zero? k => false
+    G.node:= delete!(G.node, k)
+    G.edge:= [e for e in G.edge | not member? (x, e)]
+    true
+@ 
+
+Local version also working for [[BasicType]].
+<<FiniteGraph deleteEdge local>>=
+deleteEdge!(G:%, source:nodes, target:nodes):edges ==
+if not empty? G.edge then 
+    k:Integer := myposition(G.edge, source, target)
+    if not zero? k then 
+        delete!(G.edge, k)
+edge(source, target)
+@ 
+
+<<FiniteGraph implementation destructive operations>>=
+subst!(x:nodes, y:nodes, G:%):Boolean == 
+	-- first check trivialities
+	member?(y, nodeList G) => false
+	not member?(x, nodeList G) => false
+	G.node:= map!((v:nodes):nodes +-> (if v=x then y else v), G.node)
+	G.edge:= map!((e:edges):edges +-> subst(x, y, e), G.edge)
+	true
+@ 
+
+<<FiniteGraph implementation destructive operations>>=
+fuse!(x:nodes, y:nodes, G:%):Boolean == 
+    -- check for trivialities
+    k:Integer := position(x, nodeList G)
+    zero? k or not member?(y, nodeList G) => false
+    -- remove vertex
+    G.node := delete!(G.node, k)
+    -- update edges and remove duplicates
+    G.edge := map!((e:edges):edges +-> subst(x, y, e), G.edge)
+    G.edge := removeDuplicates!(G.edge)
+    true
+
+removeLoops!(G:%):% ==  
+    G.edge:= [e for e in edgeList G | not ((first e) = (second e))]
+    G
+@
+
+\subsection{Nondestructive modifications}
+<<FiniteGraph declarations copying operations>>=
+--copying modifications
+addNode:(%, List nodes) -> %
+addNode:(%, nodes) -> %
+addEdge:(%, nodes, nodes) -> %
+--addEdge:(%,List edges) -> %
+delete:(%, nodes) -> %
+++ \spad{delete(G,x)} deletes the vertex x and all adjacent edges.
+fuse:(nodes, nodes, %) -> %
+++ \spad{fuse(x,y,G)} returns the graph with x and y identified. Duplicate edges are removed and the new vertex is called y.
+removeLoops:(%) -> %
+++ \spad{removeLoops(G)} returns the graph with all loops removed.
+@
+<<FiniteGraph implementation copying operations>>=
+addNode(G:%, x:List nodes):% == 
+    [removeDuplicates concat(nodeList G, x), copy edgeList G]
+
+addNode(G:%, x: nodes):% == 
+    member?(x, G) => copy G
+    [concat(nodeList G, [x]), copy edgeList G]
+
+addEdge(G:%, source:nodes, target:nodes):% ==
+    e:edges := edge (source, target)
+    -- check if anything todo
+    member? (e, edgeList G) => copy G
+    resnodes:List nodes := removeDuplicates concat(nodeList G, [source, target])
+    resedges:List edges :=  concat(edgeList G, [e])
+    [resnodes, resedges]
+
+delete(G:%, x:nodes):% == 
+    G1:%:= copy G
+    deleteNode!(G1, x)
+    G1
+@ %
+
+
+<<FiniteGraph implementation copying operations>>=
+fuse(x:nodes, y:nodes, G:%):% == 
+    G1:%:= copy G
+    fuse!(x, y, G1)
+    G1
+@
+
+<<FiniteGraph implementation copying operations>>=
+removeLoops(G:%):% ==  
+    G1:%:= copy G
+    removeLoops! G1
+    G1
+@
+
+\subsection{Animals}
+<<FiniteGraph declarations animals>>=
+animals:(%, nodes) -> List Set nodes
+++ \spad{animals(G,x)} returns the list of animals based at vertex x.
+@
+<<FiniteGraph implementation animals>>=
+recursiveanimals:(%, nodes)->List Set nodes
+
+recursiveanimals(G:%, x:nodes):List Set nodes == 
+    S:Set nodes
+    nbx:List nodes:= neighbours(x, G)
+    empty? nbx => [set [x]]
+    y:nodes := first nbx
+    -- case 1: y is not in the animal -> delete it
+    res1:List Set nodes:= recursiveanimals(delete(G, y), x)
+    -- case 2: y is in the animal -> keep it and fuse
+    res2:List Set nodes:= recursiveanimals(removeLoops fuse(y, x, G), x)
+    concat(res1, [union(y, S) for S in res2])
+
+animals(G:%, x:nodes):List Set nodes == 
+    -- check for trivialities
+    not member?(x, G) => empty()
+    recursiveanimals(G, x)
+@ 
+
+
+\subsection{Adjacency matrix}
+
+<<FiniteGraph declarations-adjacencymatrix>>=
+adjacencyMatrix:%->AdjacencyMatrix nodes
+++ \spad{adjacencyMatrix(G)} returns the adjacency matrix of a graph
+@ 
+<<FiniteGraph implementation-adjacencymatrix>>=
+adjacencyMatrix(G:%):AdjacencyMatrix nodes ==
+    res:Matrix Integer := zero(#nodeList G, #nodeList G)
+    for e in edgeList(G) repeat 
+        i:Integer := position(source e, nodeList G)
+        j:Integer := position(target e, nodeList G)
+        res(i, j):=1
+        res(j, i):=1
+    return adjacencyMatrix(res, copy nodeList G)
+@ 
+
+<<FiniteGraph implementation-adjacencymatrix alt>>=
+adjacencyMatrix(g:%):AdjacencyMatrix nodes == {
+        import from Integer;
+        import from List List Integer;
+        import from Matrix Integer;
+        res:AdjacencyMatrix nodes := adjacencyMatrix [matrix ([[0@Integer for x:nodes in nodeList g] for y:nodes in nodeList g]) $(Matrix Integer), nodeList g];
+        for e:edges in edgeList(g) repeat {
+                i:Integer := position(source e,nodeList g);
+                j:Integer := position(target e,nodeList g);
+                (res.matrix)(i,j):=1@Integer;
+                (res.matrix)(j,i):=1@Integer;
+        }
+        return res;
+}
+@ 
+\section{package FINGRF2 FiniteGraphFunctions2}
+<<package FINGRF2 FiniteGraphFunctions2>>=
+)abbrev package FINGRF2 FiniteGraphFunctions2
+++ Author: Franz Lehner lehner@math.tugraz.at
+++ Date Created: 2011
+++ Date Last Updated: 29 July 2011
+++ Fix History: 
+++ Basic Functions:
+++ Related Constructors:
+++ Also See:
+++ AMS Classifications:
+++ Keywords:
+++ References:
+++ Description:
+++   A domain for mappings between graphs
+FiniteGraphFunctions2(V1:SetCategory, V2:SetCategory): Exports == Implementation where 
+  Exports ==> with 
+    map:(V1->V2, FiniteGraph V1) -> FiniteGraph V2
+    ++ \spad{map(f,G)} maps the function f to the vertices of G1
+  Implementation ==> add
+    map(f, G1) == 
+        v1:List V1:=nodeList G1
+        v2:List V2:=map(f, v1)$ListFunctions2(V1, V2)
+        G2:FiniteGraph V2 :=new()
+        addNode!(G2, v2)
+        for e in edgeList G1 repeat
+            addEdge!(G2, f(first e), f(second e))
+        G2
+@ %
+
+
+
+\section{domain CAYGRA CayleyGraph}
+Cayley graphs of a group $G$ are parametrized by lists of generators.
+
+<<domain CAYGRA CayleyGraph>>=
+edgesG ==> Record(source:G, target:G)
+
+)abbrev domain CAYGRA CayleyGraph
+++ Author: Franz Lehner lehner@math.tugraz.at
+++ Date Created: 2009
+++ Date Last Updated: 29 July 2011
+++ Fix History: 
+++ Basic Functions:
+++ Related Constructors:
+++ Also See:
+++ AMS Classifications:
+++ Keywords:
+++ References:
+++ Description:
+++   A domain for finite and infinite Cayley Graphs
+CayleyGraph(G: Group):CGcat == CGimp where
+    CGcat ==> GraphCategory(G, edgesG) with
+        <<cayleygraph-declarations>>
+        <<cayleygraph-declarations-subgraphs>>
+@ %
+<<domain CAYGRA CayleyGraph>>=
+    CGimp ==> add
+        Rep := List G
+        g:G
+        <<cayleygraph-implementation>>        
+        <<cayleygraph-implementation-subgraphs>>        
+@ %
+\subsection{Things required by [[GraphCategory]]}
+<<cayleygraph-declarations>>=
+new:List G -> %
+coerce:% -> OutputForm
+
+outBoundary:(List G, %)->List G
+++ \spad{outBoundary(lv,G)} returns the vertex boundary of lv,
+++ i.e., those vertices, which are not in lv but adjacent to lv.
+
+animals:(G, %)->Stream List Set G
+++ \spad{animals(x,G)} returns a stream of sets of animals
+++ (=connected subgraphs) containing \spad{x}.
+++ The n-th component of the stream contains a list of animals
+++ of size n
+@
+The representation is by a list of generators which determine the edges.
+<<cayleygraph-implementation>>=
+new(gens:List G):% == gens
+
+coerce(CG:%):OutputForm ==
+        prefix( "CayleyGraph"::Symbol::OutputForm ,[bracket [g::OutputForm for g in CG::Rep]])
+
+source(ed:edgesG):G == ed.source
+target(ed:edgesG):G == ed.target
+
+outedges(x:G, CG:%):List edgesG == [[x, g*x]$edgesG for g in CG]
+
+inedges(x:G, CG:%):List edgesG == [[inv(g)*x, x]$edgesG for g in CG]
+
+neighbours(x:G, CG:%):List G == removeDuplicates [g*x for g in CG]
+
+nodesType(g:%):Type == G
+
+outBoundary(A:List G, CG:%):List G ==
+    res:List List G:= [[g*x for g in CG ] for x in A]
+    res1:List G:= removeDuplicates [x for x in reduce(concat!, res)|not member?(x, A)]
+    
+recursiveAnimals1:(Set G, %) -> List Set G
+-- computes all animals obtained from A by adding one vertex
+recursiveAnimals1(A:Set G, CG:%):List Set G ==
+    [union(A, x) for x in outBoundary(parts A, CG)]
+
+recursiveAnimals:(List Set G, %) -> List Set G
+-- computes all animals obtained from each element of the list
+-- by adding one vertex and removes duplicates
+recursiveAnimals(lA:List Set G, CG:%):List Set G ==
+    -- trivial case
+    empty? lA => empty()
+    res1:List List Set G:=[recursiveAnimals1(A, CG) for A in lA]
+    removeDuplicates reduce (concat, res1)
+    
+animals(x:G, CG:%) == 
+    _generate((lA:List Set G):List Set G +-> recursiveAnimals(lA, CG),[set([x])$(Set G)])
+@ 
+
+
+<<cayleygraph-declarations-subgraphs>>=
+subgraph:(Set G, %) -> FiniteGraph(G)
+++ \spad{subgraph(A,CG)} returns the subgraph spanned by the vertices $A$
+++ as a finite graph.
+@ 
+<<cayleygraph-implementation-subgraphs>>=
+subgraph(A:Set G, CG:%): FiniteGraph(G) ==
+    res:FiniteGraph(G) := new()
+    addNode!(res, parts A)
+    s:G
+    for g in parts A repeat 
+        for s in CG::Rep | member?((x:G := s*g), A) repeat 
+            addEdge!(res, g, x)
+    res
+@ %
+
+<<domain SUBGRA SubGraph>>=
+)abbrev domain SUBGRA SubGraph
+++ Author: Franz Lehner lehner@math.tugraz.at
+++ Date Created: 03 November 2011
+++ Date Last Updated: 
+++ Fix History: 
+++ Basic Functions:
+++ Related Constructors:
+++ Also See:
+++ AMS Classifications:
+++ Keywords:
+++ References:
+++ Description:
+++   A package for subgraphs of Graphs given
+++   by a selector.
+SubGraph(V:SetCategory, E:SetCategory, G:GraphCategory(V, E)):Exports == Implementation where
+  EDGE ==> Record(s:V,t:V)
+  Exports ==> Join(SetCategory, GraphCategory(V, E)) with
+    subGraph:(G, V -> Boolean) -> %
+    ++ \spad{new(G0,f)} selects a subgraph of \spad{G0}
+    ++ using the boolean function \spad{f}
+    baseGraph:% -> G
+    ++ \spad{baseGraph(G1)} returns the underlying
+    ++ graph of \spad{G1}
+    selector:% -> (V->Boolean)
+    ++ \spad{selector(G1)} returns the vertex selecting function
+    ++ of \spad{G1}
+    edge?:(E, %) -> Boolean
+    ++ \spad{edge?(e,G1)} checks whether both end points of
+    ++ \spad{e} are vertices of \spad{G1}
+    vertex?:(V, %) -> Boolean
+    ++ \spad{vertex?(x,G1)} checks whether 
+    ++ \spad{x} is a vertex of \spad{G1}
+  Implementation ==> add
+    Rep := Record(baseGraph:G, selector:V -> Boolean)
+    rep(x:%):Rep == x :: Rep
+    per(r:Rep):% == r :: %
+    
+    subGraph(G0,f) == per( [G0, f]$Rep )
+    
+    sourcedge(e:E):EDGE == [source(e)$G, target(e)$G]
+        
+    baseGraph(G1:%):G == (rep G1).baseGraph
+
+    selector(G1:%):(V->Boolean) == (rep G1).selector
+
+    vertex?(x:V, G1:%):Boolean == (rep G1).selector x
+
+    edge?(e:E, G1:%):Boolean ==
+        se:EDGE:= sourcedge e
+        vertex?(se.s, G1) and vertex?(se.t, G1) 
+
+    coerce(G1:%):OutputForm ==
+        hconcat(outputForm("Subgraph of "::Symbol)$OutputForm, coerce(baseGraph G1)$G)        
+
+    neighbours(x:V, G1:%): List V ==
+        if not vertex?(x, G1) then
+            return empty()
+        G0:= baseGraph G1
+        nbG0:= neighbours(x, G0)
+        select((rep G1).selector, nbG0)
+        
+    source(e:E):V == sourcedge(e).s
+
+    target(e:E):V == sourcedge(e).t
+
+    inedges(x:V,G1:%):List(E) ==
+        [e for e in inedges(x, baseGraph G1) | edge?(e, G1)]
+
+    outedges(x:V,G1:%):List(E) ==
+        [e for e in outedges(x, baseGraph G1) | edge?(e, G1)]
+@ %
+<<todo>>=
+
+
+@  %
+<<domain SUBGRA SubGraph notworking>>=
+edgesG ==> Record(source:G, target:G)
+
+)abbrev domain SUBGRA SubGraph
+++ Author: Franz Lehner lehner@math.tugraz.at
+++ Date Created: 2009
+++ Date Last Updated: 29 July 2011
+++ Fix History: 
+++ Basic Functions:
+++ Related Constructors:
+++ Also See:
+++ AMS Classifications:
+++ Keywords:
+++ References:
+++ Description:
+++   A domain for subgraphs of Graphs given
+++   by a selector.
+SubGraph(V:SetCategory, E:SetCategory):Exports == Implementation where
+  Exports ==> GraphCategory(V, E) with
+    new:(GraphCategory(V, E), V -> Boolean) -> %
+  Implementation ==> add
+    Rep := Record(baseGraph:GraphCategory(V, E), selector:V -> Boolean)
+    rep(x:%):Rep == x :: Rep
+    per(r:Rep):% == r :: %
+    
+    new(G,f) == per( [G, f]$Rep )
+    
+    neighbours(x:V, G1:%): List V ==
+        G0:= (rep G1).baseGraph
+        nbG0:= neighbours(x,G0)
+        select((rep G1).selector, nbG0)
+    
+    f(x:V):Boolean == false
+@  %
+
+<<*>>=
+<<domain ADJMAT AdjacencyMatrix>>
+<<category GRAPHC GraphCategory>>
+<<domain EDGE Edge>>
+<<domain FGRAPH FiniteGraph>>
+<<package FINGRF2 FiniteGraphFunctions2>>
+<<domain CAYGRA CayleyGraph>>
+<<domain SUBGRA SubGraph>>
+<<license>>
+@
+
+\section{License}
+<<license>>=
+--Copyright (c) 2009, Franz Lehner <lehner@math.tu-graz.ac.at>
+--
+--Redistribution and use in source and binary forms, with or without
+--modification, are permitted provided that the following conditions are
+--met:
+--
+--    - Redistributions of source code must retain the above copyright
+--      notice, this list of conditions and the following disclaimer.
+--
+--    - Redistributions in binary form must reproduce the above copyright
+--      notice, this list of conditions and the following disclaimer in
+--      the documentation and/or other materials provided with the
+--      distribution.
+--
+--THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
+--IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+--TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
+--PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER
+--OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+--EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+--PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+--PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+--LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+--NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+--SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+@
