@@ -1,0 +1,270 @@
+% -*- mode: Noweb; noweb-code-mode: aldor-mode -*-
+
+\chapter{Matrices}
+
+\section{package PERMATP PermutationMatrixPackage}
+
+<<package PERMATP PermutationMatrixPackage>>=
+)abbrev package PERMATP PermutationMatrixPackage
+++ Author: Franz Lehner lehner@math.tugraz.at
+++ Date Created: 2008
+++ Date Last Updated: 20 July 2011
+++ Basic Functions:
+++ Related Constructors:
+++ Also See:
+++ AMS Classifications:
+++ Keywords:
+++ References:
+++ Description:
+++   Permute the rows and columns of a matrix.
+PermutationMatrixPackage(R:Ring):Exports == Implementation where
+  Exports ==> with 
+    _*:(Permutation Integer, Matrix R) -> Matrix R
+    ++ \spad{pi * A} permutes the square matrix $A$ according to the
+    ++ change of basis given by the permutation $\pi$.
+  Implementation ==>  add
+    _*(p:Permutation Integer, A:Matrix R):Matrix R ==  
+        if not (n:Integer:=nrows(A)::Integer) = ncols(A)::Integer then
+            error "not a square matrix"
+        mp:Set Integer:= movedPoints p
+        if (min mp) < 1 or (max mp) > n then
+            error "Permutation out of range"
+        -- from matcat.spad:
+        -- A(ilist,jlist) selects submatrix with row indices ilist
+        -- and column indices jlist
+        indic:List Integer := [eval(p,i) for i in 1..n]
+        A(indic,indic)
+@ 
+
+\section{package UNTRPGK UnitaryPackage}
+<<package UNTRPGK UnitaryPackage>>=
+)abbrev package UNTRPGK UnitaryPackage
+++ Author: Franz Lehner lehner@math.tugraz.at
+++ Date Created: 2008
+++ Date Last Updated: 20 July 2011
+++ Basic Functions:
+++ Related Constructors:
+++ Also See:
+++ AMS Classifications:
+++ Keywords:
+++ References:
+++ Description:
+++   Package to generate matrices for finite Fourier transform.
+UnitaryPackage:Exports == Implementation where
+  Exports ==> with
+    fourierMatrix:(PositiveInteger,Symbol)->Matrix Expression Integer
+    ++ \spad{fourierMatrix(n,x)} builds the matrix of the finite fourier transform
+    ++ where the root of unity is expressed as algebraic number
+    fourierMatrix:(PositiveInteger)->Matrix Complex Expression Integer
+    ++ \spad{fourierMatrix(n)} builds the matrix of the finite fourier transform
+    ++ where the root of unity is expressed as a complex exponential
+    rootOfUnity:Integer -> Complex Expression Integer
+    ++ \spad{rootOfUnity(n)} constructs the n-th primitive root of unity
+  Implementation ==> add
+    <<UnitaryPackage rootOfUnity>>
+    <<UnitaryPackage FourierMatrix>>
+
+@
+\subsection{Roots of Unity}
+<<UnitaryPackage rootOfUnity>>=
+rootOfUnity(n:Integer):Complex Expression Integer == 
+    ii:Complex Expression  Integer := complex(0,1)
+    pi:=coerce(pi()$Pi)$PiCoercions(Integer)
+    exp(2*pi*ii/n::(Complex Expression Integer))
+@ %
+\subsection{Symbolic  FourierMatrix}
+<<UnitaryPackage FourierMatrix>>=
+fourierMatrixold(n:PositiveInteger,x:Symbol):Matrix Expression Integer ==
+--    import from Integer,SingletonAsOrderedSet, UniversalSegment(NonNegativeInteger);
+    p:SparseUnivariatePolynomial Expression Integer := 1
+--    import from List SparseUnivariatePolynomial Expression Integer,NonNegativeInteger;
+--    p:=p+reduce("+",[shiftLeft(p,k-1) for k in 2@NonNegativeInteger..n::NonNegativeInteger])
+--    p:=p+reduce("+",[shiftLeft(p,k-1) for k in 2..n])    
+    p:=p+reduce("+",[shiftLeft(p,k) for k in 1..n while k<n])        
+    r:Expression Integer:= rootOf(p,x)
+--    import from List List Expression Integer
+    res:Matrix Expression Integer := 1/sqrt(n::Integer::(Expression Integer))*matrix [[r^(k*m) for k in 0@Integer..n::Integer-1] for m in 0@Integer..n::Integer-1]
+
+fourierMatrix(n:PositiveInteger,x:Symbol):Matrix Expression Integer ==
+    xs:Expression Integer := coerce x
+    p:SparseUnivariatePolynomial Expression Integer := cyclotomic(n,xs::SparseUnivariatePolynomial Expression Integer)$(NumberTheoreticPolynomialFunctions SparseUnivariatePolynomial Expression Integer)
+    r:Expression Integer:= rootOf(p,x)
+    res:Matrix Expression Integer := 1/sqrt(n::Integer::(Expression Integer))*matrix [[r^(k*m) for k in 0@Integer..n::Integer-1] for m in 0@Integer..n::Integer-1]
+@ %
+\subsection{Complex  FourierMatrix}
+<<UnitaryPackage FourierMatrix>>=
+fourierMatrix(n:PositiveInteger):Matrix Complex Expression Integer ==
+    rou:Complex Expression Integer:=rootOfUnity(n::Integer)
+    pref:Complex Expression Integer := (1/sqrt(n::Integer::(Complex Expression Integer)))
+    res:Matrix Complex Expression Integer := pref * matrix [[rou^(k*m) for k in 0@Integer..n::Integer-1] for m in 0@Integer..n::Integer-1]
+@ %
+
+\section{package MTENSPK MatrixTensorPackage}
+<<package MTENSPK MatrixTensorPackage>>=
+)abbrev package MTENSPK MatrixTensorPackage
+++ Author: Franz Lehner lehner@math.tugraz.at
+++ Date Created: 2008
+++ Date Last Updated: 20 July 2011
+++ Basic Functions:
+++ Related Constructors:
+++ Also See:
+++ AMS Classifications:
+++ Keywords:
+++ References:
+++ Description:
+++   Package for Kronecker tensor products of matrices.
+MatrixTensorPackage(R:Ring):Exports == Implementation where
+    Exports ==> with
+        <<TensorPackage declarations>>
+    Implementation ==> add
+        <<TensorPackage implementation>>
+@ 
+
+<<TensorPackage declarations>>=
+tensorProduct:(Matrix R,Matrix R)-> Matrix R
+++ \spad{TensorProduct(A,B)} builds the tensor product (Kronecker product)
+++ of the matrices $A$ and $B$ by concatenating multiples of $B$ into a big matrix.
+
+flipTensor:(Matrix R, Integer,Integer,Integer,Integer)-> Matrix R
+++ \spad{FlipTensor(C,m1,n1,m2,n2)} transforms a matrix $C=A\otimes B$
+++ into the matrix $B\otimes A$. Here $A$ is assumed to be $m_1\times n_1$ and
+++ $B$ is $m_2\times n_2$.
+
+flipTensor:(Matrix R, Integer,Integer)-> Matrix R
+++ \spad{FlipTensor(C,n1,n2)} transforms a matrix $C=A\otimes B$
+++ into the matrix $B\otimes A$. Here $A$ is assumed to be $n_1\times n_1$ and
+++ $B$ is $n_2\times n_2$.
+@ 
+
+\subsection{tensorProduct}
+\spad{TensorProduct(A,B)} builds the tensor product (Kronecker product)
+of the matrices $A$ and $B$ by concatenating multiples of $B$ into a big matrix.
+
+<<TensorPackage implementation>>=
+tensorProduct(A:Matrix R, B:Matrix R):Matrix R ==
+    i,j: Integer
+    res1:List Matrix R := [ reduce(horizConcat$(Matrix R), [A(i,j)*B for j in 1..ncols(A)]) for i in 1..nrows(A)]
+    reduce(vertConcat,res1)
+@ 
+
+\subsection{tensorCoordinate}
+
+Let $v=(v_i)_{i=1}^{n_1}$ and  $w=(w_j)_{j=1}^{n_2}$ be vectors.
+The the columns representation of the vector $v\otimes w$ is either
+$$
+u=
+\begin{matrix}
+  v_1w_1\\
+  v_1w_2\\
+  \vdots\\
+  v_1w_{n_2}\\
+  v_2 w_1\\
+  v_2 w_2\\
+  \vdots
+  v_{n_1}w_1\\
+  \vdots\\
+  v_{n_1}w_{n_2}
+\end{matrix}
+\quad
+\text{or}
+\quad
+u=
+\begin{matrix}
+  w_1v_1\\
+  w_1v_2\\
+  \vdots\\
+  w_1v_{n_1}\\
+  w_2 v_1\\
+  w_2 v_2\\
+  \vdots
+  w_{n_2}v_1\\
+  \vdots\\
+  w_{n_2}v_{n_1}
+\end{matrix}
+$$
+thus $v_iw_j$ either goes to $u_{(i-1)n_2+j}$ or $u_{(j-1)n_1+i}$.
+Therefore the map exchanging the two representations maps 
+$u_{(i-1)n_2+j}$ to $u'_{(j-1)n_1+i}$.
+
+<<TensorPackage implementation>>=
+-- determine coordinates of tensor product of two vectors
+tensorCoordinate(s:Integer,n1:Integer,n2:Integer):Integer == 
+    qq:Record(quotient:Integer,remainder:Integer):=divide(s,n2)
+    i:Integer:= qq.quotient+1
+    j:Integer:=qq.remainder               
+    if zero? j then 
+        j := n2
+        i := i-1
+    (j-1)*n1+i
+@ 
+
+\subsection{flipTensor}
+\spad{FlipTensor(C,m1,n1,m2,n2)} transforms a matrix $C=A\otimes B$
+into the matrix $B\otimes A$. Here $A$ is assumed to be $m_1\times n_1$ and
+$B$ is $m_2\times n_2$.
+
+\spad{FlipTensor(C,n1,n2)} transforms a matrix $C=A\otimes B$
+into the matrix $B\otimes A$. Here $A$ is assumed to be $n_1\times n_1$ and
+$B$ is $n_2\times n_2$.
+
+<<TensorPackage implementation>>=
+flipTensor(A:Matrix R, m1:Integer,n1:Integer,m2:Integer,n2:Integer):Matrix R ==
+    if (m1*m2 ~= nrows(A)::Integer  or n1*n2 ~= ncols(A)::Integer) then 
+            error "Size does not fit"
+    -- build up the permutation
+    s: Integer
+    pright:List Integer := [ tensorCoordinate(s,n2,n1) for s in 1..n1*n2]
+    pleft:List Integer := [ tensorCoordinate(s,m2,m1) for s in 1..m1*m2]
+    A(pleft,pright)
+
+
+flipTensor(A:Matrix R, n1:Integer,n2:Integer):Matrix R == flipTensor(A, n1,n1,n2,n2)
+@ 
+
+\section{package CompanionMatrixPackage}
+The companion (Frobenius) matrix of a univariate polynomial
+$p(x)=a_0+a_1x+\dots+a_{n-1}x^{n-1}+x^n$ is the matrix
+$$
+A =
+\begin{matrix}
+  0 & 0    &\dots & -a_0 \\
+  1 &\ddots&      & -a_1 \\
+    &\ddots&      & \vdots \\
+  0 &      &  1   & -p_{n-1}
+\end{matrix}
+$$
+<<package COMPMP CompanionMatrixPackage>>=
+)abbrev package COMPMP CompanionMatrixPackage
+++ Author: Franz Lehner lehner@math.tugraz.at
+++ Date Created: 2008
+++ Date Last Updated: 20 July 2011
+++ Basic Functions:
+++ Related Constructors:
+++ Also See:
+++ AMS Classifications:
+++ Keywords:
+++ References:
+++ Description:
+++   Package to generate companion matrices.
+CompanionMatrixPackage(R:IntegralDomain,Rx:UnivariatePolynomialCategory R):Exports == Implementation where
+  FR ==> Fraction R
+  Exports ==> with
+    companionMatrix:Rx->Matrix FR
+  Implementation ==> add
+    companionMatrix(p) ==
+        n1:=subtractIfCan(degree p,1)
+        n1 case "failed" => matrix [[0$FR]] --$
+        coeff:Vector R:=-vectorise(p,n1+1)
+        coeff1:List FR := [c/leadingCoefficient p for c in parts coeff]
+        res:Matrix FR:= diagonalMatrix [1 for k in 1..n1]
+        res:=vertConcat (matrix [[0 for k in 1..n1]],res)
+        horizConcat (res,transpose matrix [coeff1])
+@ 
+
+
+<<*>>=
+<<package PERMATP PermutationMatrixPackage>>
+<<package UNTRPGK UnitaryPackage>>
+<<package MTENSPK MatrixTensorPackage>>
+<<package COMPMP CompanionMatrixPackage>>
+@ 
